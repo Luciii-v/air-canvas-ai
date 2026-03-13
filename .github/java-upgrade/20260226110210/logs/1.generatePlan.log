@@ -1,0 +1,7 @@
+2026-02-26T11:02:10.776Z [INFO] Initializing project configuration...
+2026-02-26T11:02:10.777Z [INFO] Project /Users/amitmahatha/AI-CANVAS/air-canvas-ai is a maven project, try to get java version from pom.xml
+2026-02-26T11:02:10.779Z [INFO] Project java version: 8
+2026-02-26T11:02:10.779Z [INFO] Maven project detected.
+2026-02-26T11:02:10.779Z [INFO] Build tool type: mvn
+2026-02-26T11:02:10.872Z [ERROR] JDK is not provided or detected for Java 8.
+2026-02-28T08:12:46.054Z [ERROR] Failed to prepare project configuration or init upgrade options: Canceled.
