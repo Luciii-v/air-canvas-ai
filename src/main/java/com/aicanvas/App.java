@@ -1,142 +1,73 @@
 package com.aicanvas;
 
-import org.opencv.core.*;
-import org.opencv.imgproc.Imgproc;
-import org.opencv.videoio.VideoCapture;
-
-import org.opencv.highgui.HighGui;
-import nu.pattern.OpenCV;
-import java.util.ArrayList;
-import java.util.List;
+import javax.imageio.ImageIO;
+import javax.swing.*;
+import java.awt.event.ActionEvent;
+import java.io.File;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class App {
     public static void main(String[] args) {
-        OpenCV.loadLocally();
-        System.out.println("OpenCV Loaded! Initializing Mac Webcam...");
+        System.out.println("Starting Air Canvas AI UI...");
 
-        VideoCapture camera = new VideoCapture(0);
-        if (!camera.isOpened()) {
-            System.out.println("Error: Camera not found!");
-            return;
-        }
+        CoordinateReceiver receiver = new CoordinateReceiver();
+        Thread t = new Thread(receiver);
+        t.setDaemon(true);
+        t.start();
 
-        Mat frame = new Mat();
-        Mat hsv = new Mat();
-        Mat mask = new Mat();
-        Mat canvas = new Mat(); 
-        Point lastPoint = new Point(0, 0);
+        JFrame frame = new JFrame("Air Canvas AI");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(1280, 720);
 
-        boolean isDrawing = true; // Start in draw mode by default
+        DrawingCanvas canvas = new DrawingCanvas(1280, 720);
+        frame.add(canvas);
+        frame.setVisible(true);
 
-        System.out.println("AI Canvas - Virtual Smartboard Ready!");
-        System.out.println("-> Use your highlighter to 'click' the buttons at the top of the screen.");
+        // ── Keyboard Shortcuts (WHEN_IN_FOCUSED_WINDOW = no focus needed) ──
+        InputMap  im = canvas.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        ActionMap am = canvas.getActionMap();
 
-        while (true) {
-            camera.read(frame);
-            if (frame.empty()) continue;
-
-            Core.flip(frame, frame, 1);
-            
-            if (canvas.empty()) {
-                canvas = Mat.zeros(frame.size(), frame.type());
+        // C / c  →  Clear canvas
+        im.put(KeyStroke.getKeyStroke('c'), "clear");
+        im.put(KeyStroke.getKeyStroke('C'), "clear");
+        am.put("clear", new AbstractAction() {
+            public void actionPerformed(ActionEvent e) {
+                canvas.clearCanvas();
+                System.out.println("Canvas cleared.");
             }
+        });
 
-            Imgproc.cvtColor(frame, hsv, Imgproc.COLOR_BGR2HSV);
-
-            // Fluorescent Lighting Yellow Filter
-            Scalar lowerBounds = new Scalar(20, 60, 60); 
-            Scalar upperBounds = new Scalar(50, 255, 255);
-            Core.inRange(hsv, lowerBounds, upperBounds, mask);
-
-            Imgproc.erode(mask, mask, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(5, 5)));
-            Imgproc.dilate(mask, mask, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(5, 5)));
-
-            List<MatOfPoint> contours = new ArrayList<>();
-            Mat hierarchy = new Mat();
-            Imgproc.findContours(mask, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
-
-            boolean markerFound = false;
-            Point penTip = new Point(0, 0);
-
-            if (!contours.isEmpty()) {
-                double maxArea = 0;
-                int maxAreaIdx = -1;
-                for (int i = 0; i < contours.size(); i++) {
-                    double area = Imgproc.contourArea(contours.get(i));
-                    if (area > maxArea) {
-                        maxArea = area;
-                        maxAreaIdx = i;
-                    }
-                }
-
-                if (maxAreaIdx != -1 && maxArea > 50) {
-                    markerFound = true;
-                    MatOfPoint largestContour = contours.get(maxAreaIdx);
-                    Point[] contourArray = largestContour.toArray();
-
-                    penTip = contourArray[0];
-                    for (Point p : contourArray) {
-                        if (p.y < penTip.y) {
-                            penTip = p;
-                        }
-                    }
-
-                    // --- VIRTUAL BUTTON CLICK LOGIC ---
-                    // If the marker tip enters the top 80 pixels of the screen...
-                    if (penTip.y <= 80) {
-                        if (penTip.x >= 20 && penTip.x <= 170) {
-                            isDrawing = true; // Clicked DRAW
-                        } else if (penTip.x >= 190 && penTip.x <= 340) {
-                            isDrawing = false; // Clicked HOVER
-                        } else if (penTip.x >= 360 && penTip.x <= 510) {
-                            canvas.setTo(new Scalar(0, 0, 0)); // Clicked CLEAR
-                        }
-                    }
-
-                    // --- DRAWING LOGIC ---
-                    // Only draw if we are in Draw mode AND we are NOT currently touching the UI header
-                    if (isDrawing && penTip.y > 80) {
-                        Imgproc.circle(frame, penTip, 10, new Scalar(0, 255, 0), -1); 
-                        if (lastPoint.x != 0 && lastPoint.y != 0) {
-                            Imgproc.line(canvas, lastPoint, penTip, new Scalar(255, 0, 0), 12); 
-                        }
-                        lastPoint = penTip; 
-                    } else {
-                        // Hover mode OR currently touching a button
-                        Imgproc.circle(frame, penTip, 10, new Scalar(0, 0, 255), -1); 
-                        lastPoint = new Point(0, 0); 
-                    }
+        // S / s  →  Save PNG to Desktop
+        im.put(KeyStroke.getKeyStroke('s'), "save");
+        im.put(KeyStroke.getKeyStroke('S'), "save");
+        am.put("save", new AbstractAction() {
+            public void actionPerformed(ActionEvent e) {
+                try {
+                    String ts  = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
+                                                  .format(LocalDateTime.now());
+                    File   out = new File(System.getProperty("user.home")
+                                         + "/Desktop/AirCanvas_" + ts + ".png");
+                    ImageIO.write(canvas.getCanvasImage(), "PNG", out);
+                    System.out.println("Saved → " + out.getAbsolutePath());
+                    JOptionPane.showMessageDialog(frame,
+                        "Saved to Desktop!\n" + out.getName(),
+                        "Canvas Saved ✔", JOptionPane.INFORMATION_MESSAGE);
+                } catch (Exception ex) {
+                    System.err.println("Save error: " + ex.getMessage());
                 }
             }
+        });
 
-            if (!markerFound) {
-                lastPoint = new Point(0, 0);
-            }
+        // ── 30 FPS game loop ──────────────────────────────────────────────
+        Timer timer = new Timer(33, e -> {
+            int    x   = receiver.getX();
+            int    y   = receiver.getY();
+            String cmd = receiver.getCommand();
 
-            Core.add(frame, canvas, frame);
-
-            // --- DRAW THE VIRTUAL UI BUTTONS ---
-            // 1. DRAW Button (Green)
-            Imgproc.rectangle(frame, new Point(20, 10), new Point(170, 70), new Scalar(0, 255, 0), isDrawing ? -1 : 2);
-            Imgproc.putText(frame, "DRAW", new Point(50, 50), Imgproc.FONT_HERSHEY_SIMPLEX, 0.8, isDrawing ? new Scalar(0,0,0) : new Scalar(0, 255, 0), 2);
-            
-            // 2. HOVER Button (Red)
-            Imgproc.rectangle(frame, new Point(190, 10), new Point(340, 70), new Scalar(0, 0, 255), !isDrawing ? -1 : 2);
-            Imgproc.putText(frame, "HOVER", new Point(215, 50), Imgproc.FONT_HERSHEY_SIMPLEX, 0.8, !isDrawing ? new Scalar(0,0,0) : new Scalar(0, 0, 255), 2);
-            
-            // 3. CLEAR Button (White)
-            Imgproc.rectangle(frame, new Point(360, 10), new Point(510, 70), new Scalar(255, 255, 255), 2);
-            Imgproc.putText(frame, "CLEAR", new Point(390, 50), Imgproc.FONT_HERSHEY_SIMPLEX, 0.8, new Scalar(255, 255, 255), 2);
-
-            HighGui.imshow("AI Canvas - Virtual Smartboard", frame);
-
-            if (HighGui.waitKey(1) == 27) { 
-                break; 
-            } 
-        }
-
-        camera.release();
-        HighGui.destroyAllWindows();
-        System.exit(0);
+            if (x > 0 && y > 0) canvas.updatePointer(x, y, cmd);
+            else                 canvas.resetPointer();
+        });
+        timer.start();
     }
 }
