@@ -1,3 +1,19 @@
+# Maven build output
 target/
-.DS_Store
 *.class
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+*.iml
+.vscode/
