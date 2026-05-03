@@ -1,33 +1,45 @@
-# Air Canvas AI 🎨
+# Air Canvas AI Pro 🎨 · Cinematic Edition
 
-A virtual air-drawing application powered by computer vision. Draw on a digital canvas in real-time using only your hand gestures — no mouse, no stylus, just your fingers and a webcam.
+A futuristic, high-performance virtual air-drawing application. Create stunning light paintings in real-time using advanced computer vision and cinematic rendering — no mouse, no stylus, just your hands and a webcam.
 
 ---
 
-## Architecture
+## V2 Architecture Overhaul
 
 ```
-Webcam → Python (MediaPipe) ──UDP:5005──► Java Swing Canvas
-            AI Brain                         Drawing Surface
-         backend/handtracker.py          src/.../App.java
+Webcam → Python (MediaPipe V2) ──UDP:5005──► JavaFX / Swing Hybrid
+            AI Brain (Threaded)              Cinematic Drawing Surface
+         backend/handtracker.py          src/.../App.java + DashboardUI.java
 ```
-
-Two independent processes communicate over a local UDP socket on port **5005**.
 
 | Layer | Tech | Role |
 |---|---|---|
-| Computer Vision | Python · OpenCV · MediaPipe | Hand landmark detection, gesture classification, coordinate smoothing |
-| Canvas UI | Java · Swing · Graphics2D | Real-time drawing surface, neon stroke rendering, HUD |
+| **AI Brain** | Python · MediaPipe · OpenCV | Threaded frame capture, 21-point landmark detection, pinch-to-size logic, gesture hysteresis. |
+| **Network** | UDP Socket (Port 5005) | High-density packet pipeline transmitting full hand skeletal state and telemetry. |
+| **Renderer** | Java · Graphics2D · Swing | Velocity-based light painting, Quadratic Bezier smoothing, temporal decay (10s), alpha-layered neon tubes. |
+| **Telemetry** | JavaFX · CSS · FXML | Glassmorphism dashboard, real-time FPS/Mode tracking, dynamic thickness progress bars. |
 
 ---
 
-## Gestures
+## Advanced Gestures
 
-| Gesture | Fingers Up | Action |
-|---|---|---|
-| ☝️ Index only | 1 | **DRAW** — paint rainbow neon strokes |
-| ✌️ Index + Middle | 2 | **HOVER** — move cursor without drawing |
-| 🤟 Index + Middle + Ring | 3 | **ERASE** — erase underneath the cursor |
+| Gesture | Action |
+|---|---|
+| ☝️ **Index only** | **DRAW** — paint with cinematic sunset neon strokes. |
+| 🤏 **Pinch/Spread** | **DYNAMIC SIZE** — pinch thumb & index to shrink, spread to thicken (0.2x to 2.5x). |
+| ✌️ **Peace Sign** | **ERASE** — remove light strokes with a precision eraser ring. |
+| ✋ **Open Palm (Still)** | **EXPORT** — hold still for 2s to "snap" a high-res PNG with a fiery orange flash effect. |
+| 🖐️ **Other** | **HOVER** — move the glowing Hellfire skeleton without drawing. |
+
+---
+
+## Modern Features
+
+- **Velocity Physics:** Hand speed dictates stroke behavior. Fast movements create kinetic particle scatter; slow movements create intense "burn-in" glow.
+- **Bezier Smoothing:** Linear segments are replaced by Quadratic Bezier curves for perfectly fluid, jitter-free geometry.
+- **Hellfire Skeleton:** 21-point skeletal tracking rendered as a superheated white-hot core with a pulsing crimson aura and joint-based fire particle emitters.
+- **Temporal Decay:** Living canvas where older strokes slowly fade into darkness over 10 seconds, creating a dynamic light-sculpture effect.
+- **Glassmorphism UI:** Floating telemetry dashboard featuring frosted glass panels, modern typography, and smooth fade transitions.
 
 ---
 
@@ -38,13 +50,15 @@ Two independent processes communicate over a local UDP socket on port **5005**.
 - Java 8+
 - Maven
 
-### 1 · Install Python dependencies
+### 1 · Prepare isolated backend
 ```bash
-cd backend
+cd air-canvas-ai/backend
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2 · Build the Java canvas
+### 2 · Build the cinematic canvas
 ```bash
 mvn compile
 ```
@@ -53,11 +67,13 @@ mvn compile
 
 ## Running
 
-Open **two terminals** from the repo root:
+The project is optimized for **VS Code**. Simply select the **"Run Full AI Canvas"** compound configuration from the *Run and Debug* view to launch both processes with one click.
+
+Manually:
 
 **Terminal 1 — AI Brain (Python)**
 ```bash
-python3 backend/handtracker.py
+./air-canvas-ai/backend/.venv/bin/python air-canvas-ai/backend/handtracker.py
 ```
 
 **Terminal 2 — Drawing Canvas (Java)**
@@ -65,40 +81,20 @@ python3 backend/handtracker.py
 mvn exec:java -Dexec.mainClass="com.aicanvas.App"
 ```
 
-> macOS: The first time you run the Python script, grant **camera access** to Terminal in  
-> System Settings → Privacy & Security → Camera.
-
 ---
 
-## Keyboard Shortcuts (Canvas window)
+## Keyboard Shortcuts
 
 | Key | Action |
 |---|---|
-| `C` | Clear the canvas |
-| `S` | Save canvas as PNG to Desktop |
-| `ESC` (in webcam window) | Quit the Python tracker |
-
----
-
-## Project Structure
-
-```
-air-canvas-ai/
-├── backend/
-│   ├── handtracker.py      # Python AI brain — MediaPipe + UDP sender
-│   └── requirements.txt    # Python dependencies
-├── src/main/java/com/aicanvas/
-│   ├── App.java            # Entry point — JFrame, timer loop, keyboard shortcuts
-│   ├── DrawingCanvas.java  # Swing panel — neon stroke rendering, HUD, eraser
-│   └── CoordinateReceiver.java  # UDP listener on port 5005
-├── pom.xml                 # Maven build config (Java 8)
-└── README.md
-```
+| `C` | Clear the entire canvas |
+| `S` | Manual Save (Legacy Mode) |
+| `ESC` | Quit tracker (in webcam window) |
 
 ---
 
 ## How It Works
 
-1. **Python** reads webcam frames via OpenCV, runs MediaPipe hand landmark detection, applies EMA smoothing to the index finger tip coordinates, and broadcasts `x,y,GESTURE` packets over UDP.
-2. **Java** listens on UDP port 5005, applies a second smoothing pass, checks a 3px deadzone, and renders neon glow segments onto a persistent `BufferedImage` using `AlphaComposite` layering.
-3. The two layers of smoothing (Python EMA α=0.25 + Java MIN_MOVE=3px) eliminate hand tremor and produce smooth, consistent strokes.
+1. **Python Engine:** Utilizes a threaded `VideoStream` and `model_complexity=0` for minimum latency. Transmits a high-density `gesture,thickness|x1,y1...x21,y21` packet string.
+2. **Java Receiver:** A dedicated UDP listener thread parses the 44-point skeletal manifold and pipes it into the JavaFX/Swing hybrid loop at 30+ FPS.
+3. **Cinematic Pipeline:** Applies velocity-based thickness scaling, Bezier path interpolation, and a multi-pass glow shader before rendering to a temporal stroke list with lifecycle management.

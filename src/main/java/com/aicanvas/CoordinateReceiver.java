@@ -3,34 +3,53 @@ package com.aicanvas;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.SocketTimeoutException;
+import java.awt.Point;
 
 public class CoordinateReceiver implements Runnable {
 
-    private volatile int    currentX       = 0;
-    private volatile int    currentY       = 0;
     private volatile String currentCommand = "HOVER";
+    private volatile double currentThickness = 0.5;
+    private volatile Point[] landmarks = new Point[21];
+
+    public CoordinateReceiver() {
+        for (int i = 0; i < 21; i++) landmarks[i] = new Point(0, 0);
+    }
 
     @Override
     public void run() {
         try (DatagramSocket socket = new DatagramSocket(5005)) {
-            socket.setSoTimeout(200); // resets state when hand leaves frame
-            byte[] buffer = new byte[256];
-            System.out.println("Java UDP Receiver is listening on port 5005...");
+            socket.setSoTimeout(200); 
+            byte[] buffer = new byte[1024]; // Increased buffer for full landmarks
 
             while (true) {
                 try {
                     DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
                     socket.receive(packet);
 
-                    String[] data = new String(packet.getData(), 0, packet.getLength()).split(",");
-                    if (data.length >= 2) {
-                        currentX = Integer.parseInt(data[0].trim());
-                        currentY = Integer.parseInt(data[1].trim());
-                        if (data.length >= 3) currentCommand = data[2].trim();
+                    String raw = new String(packet.getData(), 0, packet.getLength());
+                    String[] parts = raw.split("\\|");
+                    
+                    if (parts.length > 0) {
+                        String[] header = parts[0].split(",");
+                        if (header.length >= 1) currentCommand = header[0].trim();
+                        if (header.length >= 2) currentThickness = Double.parseDouble(header[1].trim());
+                    }
+
+                    if (parts.length >= 22) {
+                        for (int i = 0; i < 21; i++) {
+                            String[] coords = parts[i + 1].split(",");
+                            if (coords.length >= 2) {
+                                landmarks[i].x = Integer.parseInt(coords[0].trim());
+                                landmarks[i].y = Integer.parseInt(coords[1].trim());
+                            }
+                        }
                     }
 
                 } catch (SocketTimeoutException e) {
-                    currentX = 0; currentY = 0; currentCommand = "HOVER";
+                    currentCommand = "HOVER";
+                    for (Point p : landmarks) { p.x = 0; p.y = 0; }
+                } catch (Exception e) {
+                    // Ignore malformed packets
                 }
             }
         } catch (Exception e) {
@@ -38,7 +57,9 @@ public class CoordinateReceiver implements Runnable {
         }
     }
 
-    public int    getX()       { return currentX; }
-    public int    getY()       { return currentY; }
+    public int getX() { return landmarks[8].x; } // Index tip
+    public int getY() { return landmarks[8].y; }
     public String getCommand() { return currentCommand; }
+    public double getThickness() { return currentThickness; }
+    public Point[] getLandmarks() { return landmarks; }
 }
